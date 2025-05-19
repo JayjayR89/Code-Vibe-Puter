@@ -1,0 +1,1892 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI Iterative Website Builder (Surgical Modification)</title>
+    <script src="https://js.puter.com/v2/"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <!-- For production, include DOMPurify: -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/dompurify/2.3.10/purify.min.js"></script>
+    <style>
+        :root {
+            --primary: #4F46E5;
+            --secondary: #6366F1;
+            --success: #10B981;
+            --danger: #EF4444;
+            --light-gray: #f3f4f6;
+            --medium-gray: #e5e7eb;
+            --dark-gray: #6b7280;
+            --header-height: 60px;
+            --chat-input-height: 100px;
+            --border-color: #d1d5db;
+            /* A bit darker for borders */
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            background: var(--light-gray);
+            height: 100vh;
+            overflow: hidden;
+            color: #374151;
+            display: flex;
+            flex-direction: column;
+        }
+
+        #app {
+            display: flex;
+            flex-direction: column;
+            height: 100vh;
+        }
+
+        .header {
+            background: white;
+            border-bottom: 1px solid var(--border-color);
+            padding: 0 20px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            height: var(--header-height);
+            flex-shrink: 0;
+            z-index: 10;
+        }
+
+        .header h1 {
+            font-size: 1.1rem;
+            font-weight: 600;
+        }
+
+        .header .controls {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .header .model-selector label {
+            margin-right: 4px;
+            font-size: 0.8rem;
+            color: var(--dark-gray);
+        }
+
+        .header .model-selector select {
+            padding: 4px 6px;
+            border: 1px solid var(--border-color);
+            border-radius: 4px;
+            font-size: 0.8rem;
+            background-color: white;
+            max-width: 150px;
+        }
+
+        #mainContainer {
+            flex-grow: 1;
+            display: flex;
+            overflow: hidden;
+        }
+
+        /* Left Panel: Chat & Controls */
+        #chatPanel {
+            width: 35%;
+            min-width: 320px;
+            max-width: 450px;
+            background: white;
+            border-right: 1px solid var(--border-color);
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+        }
+
+        #chatHistory {
+            flex-grow: 1;
+            padding: 15px;
+            overflow-y: auto;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .chat-message {
+            padding: 8px 12px;
+            border-radius: 8px;
+            margin-bottom: 10px;
+            max-width: 90%;
+            word-wrap: break-word;
+            font-size: 0.9rem;
+            line-height: 1.5;
+        }
+
+        .chat-message.user {
+            background-color: var(--primary);
+            color: white;
+            align-self: flex-end;
+            border-bottom-right-radius: 2px;
+        }
+
+        .chat-message.assistant {
+            background-color: var(--light-gray);
+            color: #374151;
+            align-self: flex-start;
+            border-bottom-left-radius: 2px;
+        }
+
+        .chat-message.system {
+            background-color: #fffbe6;
+            /* Light yellow */
+            color: #713f12;
+            /* Dark yellow text */
+            border: 1px solid #fde68a;
+            /* Yellow border */
+            align-self: center;
+            font-size: 0.8rem;
+            text-align: center;
+            width: 100%;
+            max-width: 100%;
+        }
+
+
+        #chatInputArea {
+            padding: 15px;
+            border-top: 1px solid var(--border-color);
+            background: #f9fafb;
+            /* Slightly different background */
+            flex-shrink: 0;
+        }
+
+        #userInput {
+            width: 100%;
+            height: var(--chat-input-height);
+            padding: 10px;
+            border: 1px solid var(--border-color);
+            border-radius: 6px;
+            font-family: inherit;
+            font-size: 0.9rem;
+            resize: none;
+            /* Usually no resize for chat inputs */
+            margin-bottom: 10px;
+        }
+
+        #userInput:focus {
+            outline: none;
+            border-color: var(--primary);
+            box-shadow: 0 0 0 2px rgba(79, 70, 229, 0.1);
+        }
+
+        .chat-actions {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .chat-actions .left-actions {
+            display: flex;
+            gap: 8px;
+        }
+
+
+        /* Right Panel: Preview */
+        #previewPanel {
+            flex-grow: 1;
+            background-color: #e2e8f0;
+            /* Neutral background for iframe distinction */
+            padding: 15px;
+            /* Padding around the iframe */
+            display: flex;
+            /* To center message */
+            flex-direction: column;
+            position: relative;
+            /* For inspector overlay */
+        }
+
+        #websitePreviewFrame {
+            width: 100%;
+            height: 100%;
+            border: 1px solid var(--border-color);
+            background-color: white;
+            border-radius: 6px;
+            /* Rounded corners for the iframe */
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.05);
+            display: none;
+            /* Initially hidden */
+        }
+
+        #emptyPreviewMessage {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            flex-grow: 1;
+            color: var(--dark-gray);
+            font-size: 1rem;
+            text-align: center;
+            border: 2px dashed var(--medium-gray);
+            border-radius: 8px;
+            padding: 20px;
+            background-color: white;
+        }
+
+        #emptyPreviewMessage i {
+            font-size: 2rem;
+            margin-bottom: 10px;
+            color: var(--medium-gray);
+        }
+
+        /* Streaming preview styles */
+        #codePreviewContainer {
+            width: 100%;
+            height: 100%;
+            border: 1px solid var(--border-color);
+            background-color: #1e1e1e;
+            border-radius: 6px;
+            overflow: auto;
+            color: #f8f8f2;
+            font-family: 'Courier New', monospace;
+            padding: 15px;
+            white-space: pre-wrap;
+            display: none;
+        }
+
+        .generating-indicator {
+            position: absolute;
+            top: 10px;
+            right: 30px;
+            background-color: rgba(0, 0, 0, 0.7);
+            color: white;
+            padding: 5px 10px;
+            border-radius: 4px;
+            font-size: 0.8rem;
+            display: none;
+            z-index: 100;
+        }
+
+        .generating-indicator i {
+            margin-right: 5px;
+            animation: pulse 1.5s infinite;
+        }
+
+        /* Element modification indicator */
+        .element-being-modified {
+            position: absolute;
+            top: 10px;
+            left: 30px;
+            background-color: var(--secondary);
+            color: white;
+            padding: 5px 10px;
+            border-radius: 4px;
+            font-size: 0.8rem;
+            display: none;
+            z-index: 100;
+            max-width: 60%;
+            text-overflow: ellipsis;
+            overflow: hidden;
+            white-space: nowrap;
+        }
+
+        @keyframes pulse {
+            0% {
+                opacity: 0.5;
+            }
+
+            50% {
+                opacity: 1;
+            }
+
+            100% {
+                opacity: 0.5;
+            }
+        }
+
+        /* Highlight for code diffs */
+        .code-diff-highlight {
+            background-color: rgba(99, 102, 241, 0.1);
+            border-left: 3px solid var(--secondary);
+            padding-left: 5px;
+            margin: 5px 0;
+        }
+
+        /* --- Button Styles --- */
+        .btn {
+            padding: 7px 12px;
+            border: 1px solid transparent;
+            border-radius: 6px;
+            cursor: pointer;
+            font-weight: 500;
+            font-size: 0.85rem;
+            transition: all 0.15s ease-in-out;
+            display: inline-flex;
+            align-items: center;
+            gap: 5px;
+            white-space: nowrap;
+        }
+
+        .btn i {
+            font-size: 0.9em;
+        }
+
+        /* Slightly smaller icons in buttons */
+        .btn-primary {
+            background: var(--primary);
+            color: white;
+            border-color: var(--primary);
+        }
+
+        .btn-primary:hover {
+            background: var(--secondary);
+            border-color: var(--secondary);
+        }
+
+        .btn-primary:disabled {
+            background: var(--medium-gray);
+            border-color: var(--medium-gray);
+            color: var(--dark-gray);
+            cursor: not-allowed;
+        }
+
+        .btn-outline {
+            background: white;
+            border-color: var(--border-color);
+            color: #374151;
+        }
+
+        .btn-outline:hover {
+            border-color: var(--dark-gray);
+            background-color: #f9fafb;
+        }
+
+        .btn-outline:disabled {
+            background: var(--light-gray);
+            border-color: var(--medium-gray);
+            color: var(--dark-gray);
+            cursor: not-allowed;
+        }
+
+        .btn-subtle {
+            background: transparent;
+            border-color: transparent;
+            color: var(--dark-gray);
+        }
+
+        .btn-subtle:hover {
+            background: var(--light-gray);
+            color: var(--primary);
+        }
+
+        .btn-subtle.active {
+            background: var(--secondary);
+            color: white;
+        }
+
+        /* --- ADDED: Element Edit Modal Styles --- */
+        #elementEditModalOverlay {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0, 0, 0, 0.5);
+            backdrop-filter: blur(3px);
+            z-index: 999;
+        }
+
+        #elementEditModal {
+            display: none;
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            width: 90%;
+            max-width: 550px;
+            background-color: white;
+            border-radius: 8px;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.2);
+            z-index: 1000;
+            padding: 20px;
+        }
+
+        #elementEditModal h3 {
+            margin: 0 0 15px 0;
+            font-size: 1.1rem;
+            font-weight: 600;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        #elementEditModal h3 .element-tag {
+            background-color: var(--secondary);
+            color: white;
+            padding: 2px 6px;
+            border-radius: 4px;
+            font-size: 0.8rem;
+        }
+
+        #elementEditModal h3 .element-id {
+            color: var(--dark-gray);
+            font-size: 0.8rem;
+            font-family: monospace;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            max-width: 200px;
+        }
+
+        #elementPreviewContainer {
+            margin-bottom: 15px;
+            padding: 10px;
+            background-color: var(--light-gray);
+            border: 1px solid var(--border-color);
+            border-radius: 4px;
+            max-height: 120px;
+            overflow: auto;
+            font-family: monospace;
+            font-size: 0.8rem;
+            white-space: pre-wrap;
+        }
+
+        #elementEditInput {
+            width: 100%;
+            height: 120px;
+            padding: 10px;
+            border: 1px solid var(--border-color);
+            border-radius: 6px;
+            font-family: inherit;
+            font-size: 0.9rem;
+            resize: none;
+            margin-bottom: 15px;
+        }
+
+        #elementEditInput:focus {
+            outline: none;
+            border-color: var(--primary);
+            box-shadow: 0 0 0 2px rgba(79, 70, 229, 0.1);
+        }
+
+        .element-edit-actions {
+            display: flex;
+            justify-content: flex-end;
+            gap: 8px;
+        }
+
+        /* Element highlight in preview */
+        .element-highlight-overlay {
+            position: absolute;
+            background-color: rgba(99, 102, 241, 0.1);
+            border: 2px solid var(--secondary);
+            z-index: 9999;
+            pointer-events: none;
+            transition: all 0.3s ease;
+        }
+
+        /* Modals, Loading, Toast */
+        .modal-overlay {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0, 0, 0, 0.5);
+            backdrop-filter: blur(3px);
+            z-index: 999;
+        }
+
+        .loading-overlay {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(255, 255, 255, 0.85);
+            backdrop-filter: blur(3px);
+            z-index: 1001;
+            justify-content: center;
+            align-items: center;
+            flex-direction: column;
+            color: #374151;
+            font-weight: 500;
+        }
+
+        .spinner {
+            width: 45px;
+            height: 45px;
+            border: 4px solid var(--light-gray);
+            border-top: 4px solid var(--primary);
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+            margin-bottom: 20px;
+        }
+
+        @keyframes spin {
+            0% {
+                transform: rotate(0deg);
+            }
+
+            100% {
+                transform: rotate(360deg);
+            }
+        }
+
+        #toastContainer {
+            position: fixed;
+            bottom: 20px;
+            right: 20px;
+            z-index: 1002;
+        }
+
+        .toast {
+            background-color: white;
+            border-radius: 6px;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+            padding: 12px 16px;
+            margin-top: 10px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            min-width: 300px;
+            max-width: 400px;
+            animation: slideIn 0.3s ease-out forwards;
+        }
+
+        .toast.success {
+            border-left: 4px solid var(--success);
+        }
+
+        .toast.error {
+            border-left: 4px solid var(--danger);
+        }
+
+        .toast-icon {
+            font-size: 1.2rem;
+        }
+
+        .toast.success .toast-icon {
+            color: var(--success);
+        }
+
+        .toast.error .toast-icon {
+            color: var(--danger);
+        }
+
+        .toast-content {
+            flex-grow: 1;
+        }
+
+        .toast-title {
+            font-weight: 600;
+            font-size: 0.9rem;
+            margin-bottom: 2px;
+        }
+
+        .toast-message {
+            font-size: 0.8rem;
+            color: var(--dark-gray);
+        }
+
+        .toast-close {
+            background: none;
+            border: none;
+            color: var(--dark-gray);
+            cursor: pointer;
+            font-size: 1rem;
+        }
+
+        @keyframes slideIn {
+            from {
+                transform: translateX(100%);
+                opacity: 0;
+            }
+
+            to {
+                transform: translateX(0);
+                opacity: 1;
+            }
+        }
+
+        @keyframes slideOut {
+            from {
+                transform: translateX(0);
+                opacity: 1;
+            }
+
+            to {
+                transform: translateX(100%);
+                opacity: 0;
+            }
+        }
+
+        /* Deploy Modal Styles */
+        #deployModal {
+            display: none;
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            width: 90%;
+            max-width: 450px;
+            background-color: white;
+            border-radius: 8px;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.2);
+            z-index: 1000;
+            padding: 20px;
+        }
+
+        #deployModal h3 {
+            margin: 0 0 15px 0;
+            font-size: 1.1rem;
+            font-weight: 600;
+        }
+
+        .form-group {
+            margin-bottom: 15px;
+        }
+
+        .form-group label {
+            display: block;
+            margin-bottom: 6px;
+            font-weight: 500;
+            font-size: 0.85rem;
+        }
+
+        .form-group input[type="text"] {
+            width: 100%;
+            padding: 8px;
+            border: 1px solid var(--border-color);
+            border-radius: 4px;
+            font-size: 0.9rem;
+        }
+
+        .form-group input[type="text"]:focus {
+            outline: none;
+            border-color: var(--primary);
+            box-shadow: 0 0 0 2px rgba(79, 70, 229, 0.1);
+        }
+
+        .form-group .help-text {
+            margin-top: 4px;
+            font-size: 0.75rem;
+            color: var(--dark-gray);
+        }
+
+        .folder-selector {
+            display: flex;
+            gap: 8px;
+            align-items: center;
+        }
+
+        .selected-folder {
+            padding: 8px;
+            background-color: var(--light-gray);
+            border-radius: 4px;
+            font-size: 0.85rem;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            border: 1px solid var(--border-color);
+            flex-grow: 1;
+            min-height: 34px;
+        }
+
+        .selected-folder i {
+            color: var(--dark-gray);
+            font-size: 0.9em;
+        }
+
+        .deploy-modal-actions {
+            display: flex;
+            justify-content: flex-end;
+            gap: 8px;
+            margin-top: 15px;
+        }
+
+        .hidden {
+            display: none !important;
+        }
+
+
+
+        /* Subdomain availability status styling */
+        .status-message {
+            margin-top: 4px;
+            font-size: 0.75rem;
+            padding: 3px 6px;
+            border-radius: 4px;
+            display: none;
+        }
+
+        .status-message.available {
+            color: var(--success);
+            background-color: rgba(16, 185, 129, 0.1);
+            border: 1px solid rgba(16, 185, 129, 0.3);
+            display: block;
+        }
+
+        .status-message.taken {
+            color: var(--danger);
+            background-color: rgba(239, 68, 68, 0.1);
+            border: 1px solid rgba(239, 68, 68, 0.3);
+            display: block;
+        }
+
+        .status-message.checking {
+            color: var(--dark-gray);
+            background-color: rgba(107, 114, 128, 0.1);
+            border: 1px solid rgba(107, 114, 128, 0.3);
+            display: block;
+        }
+    </style>
+</head>
+
+<body>
+    <div id="app">
+        <header class="header">
+            <h1>AI Iterative Website Builder (Surgical Modification)</h1>
+            <div class="controls">
+                <div class="model-selector">
+                    <label for="aiModelSelect">Model:</label>
+                    <select id="aiModelSelect" title="Select AI Model"></select>
+                </div>
+                <button id="downloadBtn" class="btn btn-outline" title="Download HTML file" disabled>
+                    <i class="fas fa-download"></i> Download
+                </button>
+                <button id="deployBtn" class="btn btn-primary" title="Deploy website" disabled>
+                    <i class="fas fa-cloud-upload-alt"></i> Deploy
+                </button>
+            </div>
+        </header>
+
+        <div id="mainContainer">
+            <aside id="chatPanel">
+                <div id="chatHistory">
+                    <!-- Initial system message -->
+                    <div class="chat-message system">
+                        Hello! Describe the website you want to build. After the initial build,
+                        you can select elements in the preview and ask me to refine them.
+                    </div>
+                </div>
+                <div id="chatInputArea">
+                    <textarea id="userInput" placeholder="Start by describing your website..."></textarea>
+                    <div class="chat-actions">
+                        <div class="left-actions">
+                            <button id="inspectElementBtn" class="btn btn-subtle"
+                                title="Toggle element inspector for refinement" disabled>
+                                <i class="fas fa-mouse-pointer"></i> Surgical Update
+                            </button>
+                        </div>
+                        <button id="sendBtn" class="btn btn-primary" title="Send message to AI" disabled>
+                            <i class="fas fa-paper-plane"></i> Send
+                        </button>
+                    </div>
+                </div>
+            </aside>
+
+            <main id="previewPanel">
+                <div id="emptyPreviewMessage">
+                    <i class="fas fa-drafting-compass"></i>
+                    Your website preview will appear here once generated.
+                </div>
+                <iframe id="websitePreviewFrame" title="Generated Website Preview"></iframe>
+
+                <!-- Code preview container -->
+                <div id="codePreviewContainer"></div>
+
+                <!-- Generating indicator -->
+                <div class="generating-indicator">
+                    <i class="fas fa-circle-notch fa-spin"></i> Generating...
+                </div>
+
+                <!-- Element being modified indicator -->
+                <div class="element-being-modified">
+                    <i class="fas fa-edit"></i> Modifying: <span id="elementBeingModifiedName"></span>
+                </div>
+            </main>
+        </div>
+    </div>
+
+    <!-- Modals and Overlays -->
+    <!-- ADDED: Element Edit Modal -->
+    <div class="modal-overlay" id="elementEditModalOverlay"></div>
+    <div id="elementEditModal">
+        <h3>
+            Edit <span class="element-tag" id="editElementTag">section</span>
+            <span class="element-id" id="editElementId">ai-el-123</span>
+        </h3>
+        <div id="elementPreviewContainer"></div>
+        <textarea id="elementEditInput" placeholder="Describe how you want to modify this element..."></textarea>
+        <div class="element-edit-actions">
+            <button id="cancelElementEdit" class="btn btn-outline">Cancel</button>
+            <button id="submitElementEdit" class="btn btn-primary">
+                <i class="fas fa-edit"></i> Apply Changes
+            </button>
+        </div>
+    </div>
+
+    <div class="modal-overlay" id="deployModalOverlay"></div>
+    <div id="deployModal">
+        <h3>Deploy Your Website</h3>
+        <div class="form-group">
+            <label for="subdomainInput">Subdomain</label>
+            <input type="text" id="subdomainInput" placeholder="my-awesome-site">
+            <div id="subdomainStatus" class="status-message">Checking availability...</div>
+            <div class="help-text">Your site will be available at: <strong
+                    id="subdomainPreviewUrl">your-subdomain</strong>.puter.site</div>
+        </div>
+        <div class="form-group">
+            <label for="parentFolderDisplay">Parent Folder in Puter Drive</label>
+            <div class="folder-selector">
+                <div id="parentFolderDisplay" class="selected-folder">
+                    <i class="fas fa-folder"></i> <span id="selectedFolderPath">websites</span>
+                </div>
+                <button class="btn btn-outline" id="browseFolderBtn" title="Select parent folder">
+                    <i class="fas fa-folder-open"></i>
+                </button>
+            </div>
+            <div class="help-text">The website files will be placed inside this folder.</div>
+        </div>
+        <div class="deploy-modal-actions">
+            <button class="btn btn-outline" id="cancelDeployBtn">Cancel</button>
+            <button class="btn btn-primary" id="confirmDeployBtn">
+                <i class="fas fa-cloud-upload-alt"></i> Confirm & Deploy
+            </button>
+        </div>
+    </div>
+
+    <div class="loading-overlay" id="loadingOverlay">
+        <div class="spinner"></div>
+        <div id="loadingMessage">Thinking...</div>
+    </div>
+
+    <div id="toastContainer"></div>
+
+    <script>
+        // --- Constants & Configuration ---
+        const AVAILABLE_MODELS = ["claude-3-5-sonnet", "gpt-4o-mini", "gpt-4o", "claude-3-7-sonnet", "deepseek-chat", "gemini-1.5-flash", "meta-llama/Meta-Llama-3.1-8B-Instruct-Turbo"];
+        const DEFAULT_MODEL = "claude-3-5-sonnet";
+        const ELEMENT_ID_PREFIX = "ai-el-";
+        const STREAM_UPDATE_INTERVAL = 100; // ms - Decreased for more responsive updates
+
+        // --- State ---
+        let currentModel = DEFAULT_MODEL;
+        let fullHtmlContent = "";
+        let chatMessagesForAI = [];
+        let selectedParentFolder = "websites";
+        let isInspectingMode = false;
+        let selectedElementIdForRefinement = null;
+        let selectedElementTagName = null;
+        let streamingAbortController = null;
+        let isGenerating = false;
+        let elementEditInProgress = false;
+        let elementHighlightOverlay = null;
+        // Add to your existing state variables
+        let subdomainDebounceTimeout = null;
+        let currentSubdomain = "";
+        let isSubdomainAvailable = false;
+
+        // --- DOM Elements ---
+        let websitePreviewFrameEl = document.getElementById('websitePreviewFrame'); // Use 'let' for re-assignment
+        const aiModelSelect = document.getElementById('aiModelSelect');
+        const downloadBtn = document.getElementById('downloadBtn');
+        const deployBtn = document.getElementById('deployBtn');
+        const chatHistoryContainer = document.getElementById('chatHistory');
+        const userInput = document.getElementById('userInput');
+        const sendBtn = document.getElementById('sendBtn');
+        const inspectElementBtn = document.getElementById('inspectElementBtn');
+        const emptyPreviewMessage = document.getElementById('emptyPreviewMessage');
+
+        // New elements
+        const codePreviewContainer = document.getElementById('codePreviewContainer');
+        const generatingIndicator = document.querySelector('.generating-indicator');
+        const elementBeingModified = document.querySelector('.element-being-modified');
+        const elementBeingModifiedName = document.getElementById('elementBeingModifiedName');
+
+        // Element Edit Modal
+        const elementEditModalOverlay = document.getElementById('elementEditModalOverlay');
+        const elementEditModal = document.getElementById('elementEditModal');
+        const editElementTag = document.getElementById('editElementTag');
+        const editElementId = document.getElementById('editElementId');
+        const elementPreviewContainer = document.getElementById('elementPreviewContainer');
+        const elementEditInput = document.getElementById('elementEditInput');
+        const cancelElementEdit = document.getElementById('cancelElementEdit');
+        const submitElementEdit = document.getElementById('submitElementEdit');
+
+        const loadingOverlay = document.getElementById('loadingOverlay');
+        const loadingMessage = document.getElementById('loadingMessage');
+
+        const deployModalOverlay = document.getElementById('deployModalOverlay');
+        const deployModal = document.getElementById('deployModal');
+        const subdomainInput = document.getElementById('subdomainInput');
+        const subdomainPreviewUrl = document.getElementById('subdomainPreviewUrl');
+        const selectedFolderPathSpan = document.getElementById('selectedFolderPath');
+        const browseFolderBtn = document.getElementById('browseFolderBtn');
+        const cancelDeployBtn = document.getElementById('cancelDeployBtn');
+        const confirmDeployBtn = document.getElementById('confirmDeployBtn');
+
+        const DOMPurify = window.DOMPurify || { sanitize: (html) => html }; // Fallback if library not loaded
+
+
+        // Add this function to your script
+        async function checkSubdomainAvailability() {
+            const domain = subdomainInput.value.trim().toLowerCase();
+            currentSubdomain = domain;
+
+            // Show checking status
+            subdomainStatus.textContent = 'Checking availability...';
+            subdomainStatus.className = 'status-message checking';
+
+            // Validate domain
+            const validationError = validateDomain(domain);
+            if (validationError) {
+                subdomainStatus.textContent = validationError;
+                subdomainStatus.className = 'status-message taken';
+                isSubdomainAvailable = false;
+                confirmDeployBtn.disabled = true;
+                return;
+            }
+
+            try {
+                // Try to fetch the domain to check availability
+                const response = await fetch(`https://${domain}.puter.site/`);
+                const text = await response.text();
+
+                // Check if the subdomain exists (looking for "Subdomain not found" message)
+                isSubdomainAvailable = text.includes('Subdomain not found');
+
+                // Update status message
+                subdomainStatus.textContent = isSubdomainAvailable
+                    ? `${domain}.puter.site is available!`
+                    : `${domain}.puter.site is already taken`;
+                subdomainStatus.className = `status-message ${isSubdomainAvailable ? 'available' : 'taken'}`;
+
+                // Enable/disable confirm button based on availability
+                confirmDeployBtn.disabled = !isSubdomainAvailable;
+            } catch (error) {
+                console.error('Availability check error:', error);
+                subdomainStatus.textContent = 'Error checking availability';
+                subdomainStatus.className = 'status-message taken';
+                isSubdomainAvailable = false;
+                confirmDeployBtn.disabled = true;
+            }
+        }
+
+        function validateDomain(domain) {
+            if (!domain) return 'Please enter a subdomain name';
+            if (domain.length > 63) return 'Domain name too long (max 63 characters)';
+            if (!/^[a-z0-9][a-z0-9-]*[a-z0-9]?$/.test(domain)) {
+                return 'Domain can only contain lowercase letters, numbers, and hyphens';
+            }
+            return null;
+        }
+
+
+        // --- Initialization ---
+        function initializeApp() {
+            populateModelSelector();
+            setupEventListeners();
+            updateButtonStates();
+            selectedFolderPathSpan.textContent = selectedParentFolder;
+            const initialSystemMessage = "Hello! Describe the website you want to build. After the initial build, you can select elements in the preview and ask me to refine them.";
+            chatMessagesForAI.push({ role: 'system', content: initialSystemMessage });
+            updatePreview();
+        }
+
+        function populateModelSelector() {
+            AVAILABLE_MODELS.forEach(model => {
+                const option = document.createElement('option');
+                option.value = model; option.textContent = model;
+                if (model === DEFAULT_MODEL) option.selected = true;
+                aiModelSelect.appendChild(option);
+            });
+            aiModelSelect.addEventListener('change', (e) => currentModel = e.target.value);
+        }
+
+        function setupEventListeners() {
+            sendBtn.addEventListener('click', handleSendMessage);
+            userInput.addEventListener('keypress', (e) => {
+                if (e.key === 'Enter' && !e.shiftKey) {
+                    e.preventDefault();
+                    handleSendMessage();
+                }
+            });
+            inspectElementBtn.addEventListener('click', toggleInspectMode);
+            downloadBtn.addEventListener('click', handleDownload);
+            deployBtn.addEventListener('click', handleOpenDeployModal);
+            deployModalOverlay.addEventListener('click', handleCloseDeployModal);
+            cancelDeployBtn.addEventListener('click', handleCloseDeployModal);
+            confirmDeployBtn.addEventListener('click', handleConfirmDeploy);
+            // subdomainInput.addEventListener('input', updateSubdomainPreviewText);
+            // Inside setupEventListeners function, add this:
+            subdomainInput.addEventListener('input', () => {
+                clearTimeout(subdomainDebounceTimeout);
+                updateSubdomainPreviewText();
+                subdomainDebounceTimeout = setTimeout(checkSubdomainAvailability, 300);
+            });
+            browseFolderBtn.addEventListener('click', handleBrowseFolder);
+            window.addEventListener('message', handleIframeMessage);
+            userInput.addEventListener('input', updateButtonStates);
+
+            // Element Edit Modal events
+            elementEditModalOverlay.addEventListener('click', closeElementEditModal);
+            cancelElementEdit.addEventListener('click', closeElementEditModal);
+            submitElementEdit.addEventListener('click', handleElementEdit);
+            elementEditInput.addEventListener('keydown', (e) => {
+                if (e.key === 'Escape') {
+                    closeElementEditModal();
+                }
+            });
+        }
+
+        function updateButtonStates() {
+            const hasContent = fullHtmlContent.trim() !== "";
+            downloadBtn.disabled = !hasContent || isGenerating || elementEditInProgress;
+            deployBtn.disabled = !hasContent || isGenerating || elementEditInProgress;
+            const userInputNotEmpty = userInput.value.trim() !== "";
+            sendBtn.disabled = (!userInputNotEmpty && !selectedElementIdForRefinement) || isGenerating || elementEditInProgress;
+            inspectElementBtn.disabled = !hasContent || isGenerating || elementEditInProgress;
+        }
+
+        function addMessageToChatUI(role, content) {
+            const messageDiv = document.createElement('div');
+            messageDiv.classList.add('chat-message', role);
+            if (role === 'user') {
+                messageDiv.textContent = content;
+            } else if (typeof content === 'object') {
+                messageDiv.textContent = JSON.stringify(content, null, 2);
+            } else {
+                messageDiv.innerHTML = DOMPurify.sanitize(String(content).replace(/\n/g, '<br>'));
+            }
+            chatHistoryContainer.appendChild(messageDiv);
+            chatHistoryContainer.scrollTop = chatHistoryContainer.scrollHeight;
+        }
+
+        async function handleSendMessage() {
+            const messageText = userInput.value.trim();
+            const currentRefinementTarget = selectedElementIdForRefinement;
+            const currentElementTag = selectedElementTagName;
+
+            if (!messageText && !currentRefinementTarget) return;
+
+            const userMessageContent = messageText ||
+                (currentRefinementTarget ? `Refining element: ${currentRefinementTarget}. (User provided no additional text)`
+                    : "Generate website (User provided no text).");
+
+            addMessageToChatUI('user', userMessageContent);
+            chatMessagesForAI.push({ role: 'user', content: userMessageContent });
+
+            userInput.value = "";
+            if (currentRefinementTarget && isInspectingMode) {
+                // If in inspect mode with a selected element, show the edit modal
+                showElementEditModal(currentElementTag, currentRefinementTarget);
+                return;
+            }
+
+            if (!isInspectingMode && currentRefinementTarget) {
+                if (websitePreviewFrameEl.contentWindow) {
+                    websitePreviewFrameEl.contentWindow.postMessage({ type: 'CLEAR_SELECTION' }, '*');
+                }
+            }
+            sendBtn.disabled = true;
+            updateButtonStates();
+
+            // Show code preview while generating
+            showGeneratingUI("Generating website...");
+
+            if (streamingAbortController) {
+                streamingAbortController.abort();
+                addMessageToChatUI('system', 'Previous generation/refinement aborted.');
+            }
+            streamingAbortController = new AbortController();
+            isGenerating = true;
+
+            // Store the current element ID for refinement in a stable variable
+            // since the global variable might change during processing
+            const elementToRefine = currentRefinementTarget;
+
+            if (!elementToRefine) {
+                // Only clear content for a new generation, not for refinement
+                fullHtmlContent = "";
+                updateCodePreview("");
+            }
+
+            try {
+                let streamProcessor;
+                let assistantActionSummary;
+
+                // For full website generation only - element editing now happens through the modal
+                streamProcessor = callAiForInitialBuild(messageText || "Generate a website", streamingAbortController.signal);
+                assistantActionSummary = 'Initial website generation complete.';
+
+                let accumulatedResponse = "";
+                let lastUpdateTime = 0;
+                let firstChunkReceived = false;
+
+                for await (const part of streamProcessor) {
+                    if (streamingAbortController.signal.aborted) {
+                        throw { name: 'AbortError', message: 'Streaming aborted by new request.' };
+                    }
+
+                    // Extract the text from the response
+                    let chunk = "";
+                    if (part && typeof part.text === 'string') chunk = part.text;
+                    else if (part && part.message && typeof part.message.content === 'string') chunk = part.message.content;
+                    else if (part && part.delta && typeof part.delta.content === 'string') chunk = part.delta.content;
+                    else if (typeof part === 'string') chunk = part;
+
+                    if (chunk) {
+                        if (!firstChunkReceived) {
+                            accumulatedResponse = chunk;
+                            firstChunkReceived = true;
+                        } else {
+                            accumulatedResponse += chunk;
+                        }
+
+                        // Update the preview for full generation
+                        fullHtmlContent = accumulatedResponse;
+                        const now = Date.now();
+                        if (now - lastUpdateTime > STREAM_UPDATE_INTERVAL) {
+                            updateCodePreview(fullHtmlContent);
+                            lastUpdateTime = now;
+                        }
+                    }
+                }
+
+                fullHtmlContent = accumulatedResponse;
+
+                // Final update of the preview
+                hideGeneratingUI();
+                updatePreview(true);
+
+                addMessageToChatUI('assistant', assistantActionSummary);
+                chatMessagesForAI.push({ role: 'assistant', content: assistantActionSummary });
+
+            } catch (error) {
+                if (error.name === 'AbortError' || (error.message && error.message.includes('aborted'))) {
+                    console.log('Streaming was aborted.');
+                    addMessageToChatUI('system', 'Generation/Refinement aborted.');
+                } else {
+                    console.error("AI Error:", error);
+                    const errorMessage = `Error: ${error.message}`;
+                    addMessageToChatUI('assistant', errorMessage);
+                    chatMessagesForAI.push({ role: 'assistant', content: errorMessage });
+                    showToast('error', 'AI Error', error.message);
+                }
+            } finally {
+                streamingAbortController = null;
+                isGenerating = false;
+                hideGeneratingUI();
+                updateButtonStates();
+            }
+        }
+
+        // --- Element Edit Modal Functions ---
+        function showElementEditModal(tagName, elementId) {
+            // Prepare modal content
+            editElementTag.textContent = tagName || 'element';
+            editElementId.textContent = elementId || 'unknown';
+
+            // Extract and show element preview
+            const elementHtml = extractElementPreview(elementId);
+            elementPreviewContainer.textContent = elementHtml;
+
+            // Clear previous input and show modal
+            elementEditInput.value = '';
+            elementEditModalOverlay.style.display = 'block';
+            elementEditModal.style.display = 'block';
+
+            // Focus the input
+            elementEditInput.focus();
+
+            // Create highlight overlay
+            createElementHighlightInPreview(elementId);
+        }
+
+        function extractElementPreview(elementId) {
+            if (!fullHtmlContent) return '<!-- No content -->';
+
+            const extractResult = extractElementById(fullHtmlContent, elementId);
+            if (!extractResult.found) {
+                return `<!-- Element with ID ${elementId} not found -->`;
+            }
+
+            return extractResult.elementHtml;
+        }
+
+        function closeElementEditModal() {
+            elementEditModalOverlay.style.display = 'none';
+            elementEditModal.style.display = 'none';
+            removeElementHighlightFromPreview();
+        }
+
+        async function handleElementEdit() {
+            const elementId = selectedElementIdForRefinement;
+            const tagName = selectedElementTagName;
+            const editInstructions = elementEditInput.value.trim();
+
+            if (!editInstructions || !elementId) {
+                showToast('error', 'Edit Failed', 'Please provide edit instructions');
+                return;
+            }
+
+            // Close modal but keep the highlight
+            elementEditModalOverlay.style.display = 'none';
+            elementEditModal.style.display = 'none';
+
+            // Show that we're editing this element
+            elementEditInProgress = true;
+            updateButtonStates();
+
+            // Show element being modified indicator
+            elementBeingModifiedName.textContent = `${tagName} (${elementId})`;
+            elementBeingModified.style.display = 'block';
+
+            try {
+                // Perform the surgical edit
+                const response = await performSurgicalElementEdit(editInstructions, elementId);
+
+                if (response.replacement) {
+                    // Apply the edit to the HTML
+                    fullHtmlContent = replaceElementById(fullHtmlContent, elementId, response.replacement);
+
+                    // Update the preview
+                    updatePreview(true);
+
+                    // Add a message to the chat history
+                    addMessageToChatUI('system', `Modified <${tagName}> element: ${response.explanation || 'Changes applied'}`);
+
+                    // Show a success toast
+                    showToast('success', 'Element Updated', response.explanation || 'Element has been modified');
+                } else {
+                    throw new Error('No replacement HTML was generated');
+                }
+            } catch (error) {
+                console.error('Element edit error:', error);
+                addMessageToChatUI('system', `Error modifying element: ${error.message}`);
+                showToast('error', 'Edit Failed', error.message);
+            } finally {
+                // Clean up
+                removeElementHighlightFromPreview();
+                elementBeingModified.style.display = 'none';
+                elementEditInProgress = false;
+                updateButtonStates();
+            }
+        }
+
+        function createElementHighlightInPreview(elementId) {
+            // Remove any existing highlight
+            removeElementHighlightFromPreview();
+
+            // We need to get the position of the element in the preview
+            if (websitePreviewFrameEl && websitePreviewFrameEl.contentDocument) {
+                const iframe = websitePreviewFrameEl;
+                const selectedElement = iframe.contentDocument.querySelector(`[data-ai-id="${elementId}"]`);
+
+                if (selectedElement) {
+                    // Get element position relative to the iframe
+                    const rect = selectedElement.getBoundingClientRect();
+
+                    // Create highlight overlay
+                    elementHighlightOverlay = document.createElement('div');
+                    elementHighlightOverlay.className = 'element-highlight-overlay';
+
+                    // Position overlay relative to the iframe
+                    const iframeRect = iframe.getBoundingClientRect();
+                    elementHighlightOverlay.style.left = (iframeRect.left + rect.left) + 'px';
+                    elementHighlightOverlay.style.top = (iframeRect.top + rect.top) + 'px';
+                    elementHighlightOverlay.style.width = rect.width + 'px';
+                    elementHighlightOverlay.style.height = rect.height + 'px';
+
+                    // Add to document
+                    document.body.appendChild(elementHighlightOverlay);
+                }
+            }
+        }
+
+        function removeElementHighlightFromPreview() {
+            if (elementHighlightOverlay && elementHighlightOverlay.parentNode) {
+                elementHighlightOverlay.parentNode.removeChild(elementHighlightOverlay);
+                elementHighlightOverlay = null;
+            }
+        }
+
+        async function performSurgicalElementEdit(instructions, elementId) {
+            // Extract the element from the current HTML
+            const elementData = extractElementById(fullHtmlContent, elementId);
+            if (!elementData.found) {
+                throw new Error(`Element with ID "${elementId}" not found`);
+            }
+
+            // Create a prompt focused only on modifying this element
+            const prompt = `You're an expert web developer. I need you to precisely modify this HTML element:
+
+${elementData.elementHtml}
+
+Modification instructions: "${instructions}"
+
+IMPORTANT: Provide ONLY a JSON response in this format:
+{
+  "replacement": "the complete new HTML for the element",
+  "explanation": "brief explanation of the changes made"
+}
+
+The replacement HTML must:
+1. Keep the existing data-ai-id="${elementId}" attribute
+2. Be valid HTML that can directly replace the element
+3. Only contain the changes described in the instructions
+4. Preserve the element's basic structure and purpose`;
+
+            try {
+                // Call the AI for the edit
+                const response = await puter.ai.chat(prompt, { model: currentModel });
+                let content = '';
+
+                if (response && response.message && response.message.content) {
+                    content = response.message.content;
+                } else if (typeof response === 'string') {
+                    content = response;
+                } else if (response && response.text) {
+                    content = response.text;
+                }
+
+                // Parse the JSON response
+                const jsonMatch = content.match(/\{[\s\S]*\}/);
+                if (!jsonMatch) {
+                    throw new Error('Invalid response format: JSON not found');
+                }
+
+                const jsonResponse = JSON.parse(jsonMatch[0]);
+                if (!jsonResponse.replacement) {
+                    throw new Error('Invalid response: missing replacement HTML');
+                }
+
+                return jsonResponse;
+            } catch (error) {
+                console.error('AI processing error:', error);
+                throw new Error('Failed to generate replacement: ' + error.message);
+            }
+        }
+
+
+
+        // --- AI Integration Functions ---
+        function constructAiMessages(systemPromptContent) {
+            const messages = [{ role: 'system', content: systemPromptContent }];
+            const historyToConsider = chatMessagesForAI.slice(1); // Exclude initial generic system message
+
+            // Add a limited number of recent messages
+            const maxHistoryMessages = 10; // Example limit
+            const relevantHistory = historyToConsider.slice(Math.max(0, historyToConsider.length - maxHistoryMessages));
+
+            relevantHistory.forEach(msg => {
+                messages.push({ role: msg.role, content: msg.content });
+            });
+            return messages;
+        }
+
+        async function* callAiForInitialBuild(description, signal) {
+            const systemPrompt = `You are an expert web developer. Create a complete, single-file HTML website based on the user's LATEST request in the chat history.
+All HTML, CSS (in <style> in <head>), and simple JS (in <script> before </body>) in one file.
+Responsive. Use image placeholders (e.g., https://placeholder.pics/svg/300x200/ccc/333/YourText).
+IMPORTANT: For major structural HTML elements (sections, main containers, headers, footers, navs), add a unique 'data-ai-id' attribute like 'data-ai-id="${ELEMENT_ID_PREFIX}unique-name"'. IDs MUST be unique.
+Output ONLY raw HTML, starting with <!DOCTYPE html>. No markdown.`;
+            const messages = constructAiMessages(systemPrompt);
+            const stream = await puter.ai.chat(messages, { model: currentModel, stream: true, signal: signal });
+            for await (const part of stream) { yield part; }
+        }
+
+        // --- Surgical HTML Modification Functions ---
+        function extractElementById(html, elementId) {
+            // Create a temporary DOM parser
+            const parser = new DOMParser();
+            const doc = parser.parseFromString(html, 'text/html');
+
+            // Find the element by data-ai-id
+            const element = doc.querySelector(`[data-ai-id="${elementId}"]`);
+
+            if (!element) {
+                return {
+                    elementHtml: `<!-- Element with data-ai-id="${elementId}" not found -->`,
+                    found: false
+                };
+            }
+
+            // Get the outer HTML of the element
+            const elementHtml = element.outerHTML;
+
+            // Get some context about the element (parent structure)
+            const parentPath = [];
+            let current = element.parentElement;
+
+            // Build a path of up to 3 parent elements for context
+            while (current && current.tagName !== 'HTML' && current.tagName !== 'BODY' && parentPath.length < 3) {
+                const tagWithId = current.id ?
+                    `${current.tagName.toLowerCase()}#${current.id}` :
+                    current.tagName.toLowerCase();
+                parentPath.unshift(tagWithId);
+                current = current.parentElement;
+            }
+
+            return {
+                elementHtml,
+                found: true,
+                parentPath: parentPath.join(' > ')
+            };
+        }
+
+        function replaceElementById(html, elementId, replacement) {
+            // Create a temporary DOM parser
+            const parser = new DOMParser();
+            const doc = parser.parseFromString(html, 'text/html');
+
+            // Find the element by data-ai-id
+            const element = doc.querySelector(`[data-ai-id="${elementId}"]`);
+
+            if (!element) {
+                console.warn(`Element with data-ai-id="${elementId}" not found for replacement`);
+                return html;
+            }
+
+            // Create a temporary container for the replacement HTML
+            const temp = document.createElement('div');
+            temp.innerHTML = replacement;
+
+            // Make sure the replacement has the correct data-ai-id
+            const replacementElement = temp.firstElementChild;
+            if (replacementElement && !replacementElement.hasAttribute('data-ai-id')) {
+                replacementElement.setAttribute('data-ai-id', elementId);
+            }
+
+            // Replace the element with the new content
+            if (replacementElement) {
+                element.replaceWith(replacementElement);
+            } else {
+                // If there's no valid element in the replacement, insert the HTML directly
+                const range = document.createRange();
+                const fragment = range.createContextualFragment(replacement);
+                element.replaceWith(fragment);
+            }
+
+            // Extract any new style definitions
+            const newStyles = temp.querySelectorAll('style');
+            if (newStyles.length > 0) {
+                // Check if we need to add styles to the head
+                const head = doc.querySelector('head');
+                if (head) {
+                    newStyles.forEach(style => {
+                        // Avoid duplicate styles
+                        const styleContent = style.textContent;
+                        const existingStyles = Array.from(doc.querySelectorAll('head style'))
+                            .map(s => s.textContent);
+
+                        if (!existingStyles.includes(styleContent)) {
+                            head.appendChild(style.cloneNode(true));
+                        }
+                    });
+                }
+            }
+
+            // Serialize the document back to HTML
+            return doc.documentElement.outerHTML;
+        }
+
+        // --- UI Helper Functions ---
+        function showGeneratingUI(message) {
+            // Show generating indicator
+            generatingIndicator.textContent = message;
+            generatingIndicator.style.display = 'block';
+
+            // Hide empty message if visible
+            emptyPreviewMessage.classList.add('hidden');
+
+            // Show code preview container
+            codePreviewContainer.style.display = 'block';
+
+            // Hide iframe preview if it's visible
+            websitePreviewFrameEl.style.display = 'none';
+        }
+
+        function hideGeneratingUI() {
+            generatingIndicator.style.display = 'none';
+            codePreviewContainer.style.display = 'none';
+        }
+
+        function updateCodePreview(code) {
+            if (!code) {
+                codePreviewContainer.textContent = '';
+                return;
+            }
+
+            // Display the code
+            codePreviewContainer.textContent = code;
+
+            // Auto-scroll to bottom to show latest content
+            codePreviewContainer.scrollTop = codePreviewContainer.scrollHeight;
+        }
+
+        function updatePreview(forceUpdate = false) {
+            if (fullHtmlContent && fullHtmlContent.trim() !== "") {
+                // Cache current scroll position
+                const currentScrollTop = websitePreviewFrameEl.contentWindow?.scrollY || 0;
+                const currentScrollLeft = websitePreviewFrameEl.contentWindow?.scrollX || 0;
+
+                // Hide code preview container and empty preview message
+                codePreviewContainer.style.display = 'none';
+                emptyPreviewMessage.classList.add('hidden');
+
+                // Show iframe and set content
+                websitePreviewFrameEl.style.display = 'block';
+
+                if (forceUpdate || websitePreviewFrameEl.srcdoc !== fullHtmlContent) {
+                    websitePreviewFrameEl.srcdoc = fullHtmlContent;
+
+                    // Set up load handler
+                    const handleLoad = () => {
+                        if (websitePreviewFrameEl.contentWindow) {
+                            injectScriptToIframe(websitePreviewFrameEl);
+
+                            // Restore scroll position
+                            websitePreviewFrameEl.contentWindow.scrollTo(currentScrollLeft, currentScrollTop);
+
+                            // Apply inspect mode if active
+                            if (isInspectingMode) {
+                                websitePreviewFrameEl.contentWindow.postMessage({
+                                    type: 'TOGGLE_INSPECT_MODE',
+                                    active: true
+                                }, '*');
+                            }
+                        }
+                    };
+
+                    // Use a new iframe to avoid potential issues with the old one
+                    const parent = websitePreviewFrameEl.parentNode;
+                    const newFrame = websitePreviewFrameEl.cloneNode(true);
+                    newFrame.style.display = 'block'; // Ensure visibility
+                    parent.replaceChild(newFrame, websitePreviewFrameEl);
+                    websitePreviewFrameEl = newFrame;
+
+                    // Add the load handler to the new iframe
+                    websitePreviewFrameEl.addEventListener('load', handleLoad, { once: true });
+                }
+            } else {
+                // No content, show empty message
+                websitePreviewFrameEl.srcdoc = "";
+                websitePreviewFrameEl.style.display = 'none';
+
+                // If we're not in generating mode, show the empty message
+                if (!isGenerating) {
+                    emptyPreviewMessage.classList.remove('hidden');
+                    codePreviewContainer.style.display = 'none';
+                }
+            }
+            updateButtonStates();
+        }
+
+        function injectScriptToIframe(targetIframeInstance) {
+            if (!targetIframeInstance.contentDocument || !targetIframeInstance.contentWindow) {
+                console.warn("Target iframe not ready for script injection.", targetIframeInstance);
+                return;
+            }
+            const iframeDoc = targetIframeInstance.contentDocument; // Use the passed iframe's document
+            let script = iframeDoc.getElementById('iframe-inspector-script');
+            if (script) script.remove();
+
+            script = iframeDoc.createElement('script');
+            script.id = 'iframe-inspector-script';
+            script.textContent = `
+                // START OF SCRIPT EXECUTED IN IFRAME CONTEXT
+                let __inspectModeActive = false;
+                let __currentHoverElement = null;
+                let __currentSelectedElement = null;
+                const __ELEMENT_ID_PREFIX_IFRAME = "${ELEMENT_ID_PREFIX}";
+
+                function __getElementAiId(element) { return element.dataset.aiId; }
+
+                function __sendElementInfoToParent(type, element) {
+                    if (element) {
+                        const id = __getElementAiId(element);
+                        const majorTags = ['SECTION', 'ARTICLE', 'ASIDE', 'NAV', 'HEADER', 'FOOTER', 'MAIN', 'DIV', 'P', 'H1', 'H2', 'H3', 'H4', 'H5', 'H6', 'IMG', 'A', 'BUTTON', 'UL', 'OL', 'LI', 'SPAN', 'FORM', 'INPUT', 'TEXTAREA', 'LABEL', 'TABLE', 'TR', 'TD', 'TH', 'THEAD', 'TBODY', 'TFOOT'];
+                        const tagNameUpper = element.tagName ? element.tagName.toUpperCase() : '';
+                        if (id || (tagNameUpper && majorTags.includes(tagNameUpper))) {
+                            window.parent.postMessage({ type: type, elementId: id || null, tagName: tagNameUpper.toLowerCase() }, '*');
+                        }
+                    } else if (type === 'ELEMENT_DESELECTED') {
+                         window.parent.postMessage({ type: type }, '*');
+                    }
+                }
+
+                document.addEventListener('mouseover', (event) => {
+                    if (!__inspectModeActive) return;
+                    const target = event.target;
+                    if (target === document.documentElement || target === document.body) return;
+
+                    if (__currentHoverElement && __currentHoverElement !== __currentSelectedElement) {
+                        __currentHoverElement.classList.remove('__highlighted-element-outline-iframe');
+                    }
+                    __currentHoverElement = target;
+                    const isPotentiallySelectable = __getElementAiId(__currentHoverElement) || ['SECTION', 'ARTICLE', 'ASIDE', 'NAV', 'HEADER', 'FOOTER', 'MAIN', 'DIV', 'P', 'H1', 'H2', 'H3', 'IMG', 'A', 'BUTTON', 'UL', 'OL', 'LI', 'SPAN', 'FORM', 'INPUT', 'TEXTAREA', 'LABEL', 'TABLE'].includes(__currentHoverElement.tagName.toUpperCase());
+                    if (__currentHoverElement !== __currentSelectedElement && isPotentiallySelectable) {
+                         __currentHoverElement.classList.add('__highlighted-element-outline-iframe');
+                    }
+                }, true);
+
+                document.addEventListener('mouseout', (event) => {
+                    if (!__inspectModeActive) return;
+                    const target = event.target;
+                     if (target === __currentHoverElement && __currentHoverElement !== __currentSelectedElement) {
+                        __currentHoverElement.classList.remove('__highlighted-element-outline-iframe');
+                    }
+                }, true);
+
+                document.addEventListener('click', (event) => {
+                    if (!__inspectModeActive) return;
+                    const clickedElement = event.target;
+                    
+                    const isSelectable = __getElementAiId(clickedElement) || ['SECTION', 'ARTICLE', 'ASIDE', 'NAV', 'HEADER', 'FOOTER', 'MAIN', 'DIV', 'P', 'H1', 'H2', 'H3', 'IMG', 'A', 'BUTTON', 'UL', 'OL', 'LI', 'SPAN', 'FORM', 'INPUT', 'TEXTAREA', 'LABEL', 'TABLE'].includes(clickedElement.tagName.toUpperCase());
+
+                    if (!isSelectable || clickedElement === document.documentElement || clickedElement === document.body) {
+                        if (__currentSelectedElement) {
+                            __currentSelectedElement.classList.remove('__selected-element-outline-iframe');
+                             __sendElementInfoToParent('ELEMENT_DESELECTED', null);
+                        }
+                        __currentSelectedElement = null;
+                        return;
+                    };
+
+                    event.preventDefault(); event.stopPropagation();
+
+                    if (__currentSelectedElement) { __currentSelectedElement.classList.remove('__selected-element-outline-iframe'); }
+                    
+                    __currentSelectedElement = clickedElement;
+                    __currentSelectedElement.classList.add('__selected-element-outline-iframe');
+                    if(__currentHoverElement && __currentHoverElement !== __currentSelectedElement) {
+                         __currentHoverElement.classList.remove('__highlighted-element-outline-iframe');
+                    }
+                    
+                    __sendElementInfoToParent('ELEMENT_SELECTED', __currentSelectedElement);
+                }, true);
+
+                window.addEventListener('message', (event) => {
+                    if (event.origin !== "null" && event.origin !== window.parent.location.origin && window.parent.location.protocol !== 'file:') { 
+                         console.warn("iframe script: Message from unexpected origin ignored:", event.origin); return;
+                    }
+                    if (event.data.type === 'TOGGLE_INSPECT_MODE') {
+                        __inspectModeActive = event.data.active;
+                        if (!__inspectModeActive) {
+                            if (__currentHoverElement) __currentHoverElement.classList.remove('__highlighted-element-outline-iframe');
+                            if (__currentSelectedElement) __currentSelectedElement.classList.remove('__selected-element-outline-iframe');
+                            __currentHoverElement = null; __currentSelectedElement = null;
+                        }
+                    } else if (event.data.type === 'CLEAR_SELECTION') {
+                        if (__currentSelectedElement) {
+                            __currentSelectedElement.classList.remove('__selected-element-outline-iframe');
+                            __currentSelectedElement = null;
+                        }
+                    }
+                });
+
+                const style = document.createElement('style');
+                style.textContent = \`
+                    .__highlighted-element-outline-iframe { outline: 2px dashed #4F46E5 !important; outline-offset: 1px !important; cursor: crosshair !important; background-color: rgba(79, 70, 229, 0.05) !important; z-index: 2147483647 !important; position: relative !important; }
+                    .__selected-element-outline-iframe { outline: 2px solid #6366F1 !important; outline-offset: 1px !important; box-shadow: 0 0 8px rgba(99, 102, 241, 0.4) !important; background-color: rgba(99, 102, 241, 0.1) !important; z-index: 2147483647 !important; position: relative !important;}
+                    [data-ai-id], section, article, aside, nav, header, footer, main, div, p, h1, h2, h3, h4, h5, h6, img, a, button, ul, ol, li, span, form, input, textarea, label, table { min-height: 5px; min-width: 5px; }
+                \`;
+                // 'document' here refers to iframeDoc, so this is correct.
+                document.head.appendChild(style); 
+                // END OF SCRIPT EXECUTED IN IFRAME CONTEXT
+            `;
+            iframeDoc.head.appendChild(script);
+        }
+
+        function toggleInspectMode() {
+            isInspectingMode = !isInspectingMode;
+            inspectElementBtn.classList.toggle('active', isInspectingMode);
+
+            if (websitePreviewFrameEl.contentWindow) {
+                websitePreviewFrameEl.contentWindow.postMessage({ type: 'TOGGLE_INSPECT_MODE', active: isInspectingMode }, '*');
+            }
+
+            if (isInspectingMode) {
+                addMessageToChatUI('system', 'Inspect mode ON. Click an element in the preview to select it for refinement.');
+                userInput.placeholder = "Select an element or describe general changes...";
+                showToast('success', 'Inspect Mode ON', 'Click elements in the preview.');
+            } else {
+                addMessageToChatUI('system', 'Inspect mode OFF.');
+                userInput.placeholder = "Describe your website or refinement...";
+                if (selectedElementIdForRefinement && websitePreviewFrameEl.contentWindow) {
+                    websitePreviewFrameEl.contentWindow.postMessage({ type: 'CLEAR_SELECTION' }, '*');
+                }
+                selectedElementIdForRefinement = null;
+                selectedElementTagName = null;
+            }
+            updateButtonStates();
+        }
+
+        function handleIframeMessage(event) {
+            if (event.origin !== "null" && event.origin !== window.location.origin) {
+                if (window.location.protocol === 'file:' && event.origin === "null") {
+                    // Allow for local dev
+                } else {
+                    console.warn("Main window: Message from unexpected origin ignored:", event.origin);
+                    return;
+                }
+            }
+
+            if (event.data.type === 'ELEMENT_SELECTED') {
+                selectedElementIdForRefinement = event.data.elementId;
+                selectedElementTagName = event.data.tagName;
+                const displayId = selectedElementIdForRefinement || '(general element)';
+
+                if (isInspectingMode) {
+                    // When in inspect mode, immediately show the edit modal
+                    showElementEditModal(event.data.tagName, selectedElementIdForRefinement);
+                    const message = `Selected <${event.data.tagName}> ${displayId} for editing.`;
+                    addMessageToChatUI('system', message);
+                } else {
+                    // In regular mode, just show a message that the element was selected
+                    const message = `Selected <${event.data.tagName}> ${displayId}. Describe your changes.`;
+                    addMessageToChatUI('system', message);
+                    userInput.focus();
+                    userInput.placeholder = `Refine ${event.data.tagName} ${displayId}...`;
+                }
+
+                showToast('success', 'Element Selected', `Ready to refine ${event.data.tagName}.`);
+            } else if (event.data.type === 'ELEMENT_DESELECTED') {
+                if (selectedElementIdForRefinement) {
+                    addMessageToChatUI('system', `Element selection cleared.`);
+                }
+                selectedElementIdForRefinement = null;
+                selectedElementTagName = null;
+                userInput.placeholder = isInspectingMode ? "Select an element or describe general changes..." : "Describe your website...";
+            }
+            updateButtonStates();
+        }
+
+        // --- Actions (Download, Deploy) ---
+        function handleDownload() {
+            if (!fullHtmlContent) { showToast('error', 'No Content', 'Generate a website first.'); return; }
+            const blob = new Blob([fullHtmlContent], { type: 'text/html' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url; a.download = 'ai-website.html';
+            document.body.appendChild(a); a.click(); document.body.removeChild(a);
+            URL.revokeObjectURL(url);
+            showToast('success', 'Downloaded', 'Website HTML file downloaded.');
+        }
+
+        function handleOpenDeployModal() {
+            if (!fullHtmlContent) {
+                showToast('error', 'No Content', 'Generate a website first.');
+                return;
+            }
+            subdomainInput.value = puter.randName();
+            updateSubdomainPreviewText();
+            checkSubdomainAvailability(); // Check availability for the random name
+            deployModalOverlay.style.display = 'block';
+            deployModal.style.display = 'block';
+        }
+
+        function handleCloseDeployModal() {
+            deployModalOverlay.style.display = 'none';
+            deployModal.style.display = 'none';
+        }
+
+        function updateSubdomainPreviewText() {
+            const subdomain = subdomainInput.value.trim().toLowerCase().replace(/[^a-z0-9-]/g, '-');
+            subdomainPreviewUrl.textContent = subdomain || 'your-subdomain';
+        }
+
+        async function handleBrowseFolder() {
+            try {
+                const directory = await puter.ui.showDirectoryPicker();
+                if (directory && directory.path) {
+                    selectedParentFolder = directory.path;
+                    selectedFolderPathSpan.textContent = directory.path;
+                }
+            } catch (error) {
+                if (!(error.message && error.message.includes("dialog was canceled"))) {
+                    console.warn('Directory picker:', error); showToast('error', 'Folder Error', error.message);
+                }
+            }
+        }
+
+        async function handleConfirmDeploy() {
+            let siteName = subdomainInput.value.trim().toLowerCase().replace(/[^a-z0-9-]/g, '-').replace(/^-+|-+$/g, '');
+            if (!siteName) {
+                showToast('error', 'Invalid Subdomain', 'Please enter a valid subdomain name.');
+                return;
+            }
+
+            // Don't allow deployment if the subdomain is taken
+            if (!isSubdomainAvailable) {
+                showToast('error', 'Subdomain Unavailable', 'Please choose a different subdomain.');
+                return;
+            }
+            handleCloseDeployModal();
+            showLoading(`Deploying ${siteName}.puter.site...`);
+            try {
+                const siteFolderPath = `${selectedParentFolder}/${siteName}`;
+                await puter.fs.mkdir(siteFolderPath, { createMissingParents: true });
+                await puter.fs.write(`${siteFolderPath}/index.html`, fullHtmlContent, { overwrite: true });
+                let finalSite;
+                let deployActionMessage;
+                try {
+                    await puter.hosting.get(siteName);
+                    finalSite = await puter.hosting.update(siteName, siteFolderPath);
+                    deployActionMessage = `Website updated at https://${finalSite.subdomain}.puter.site`;
+                }
+                catch {
+                    finalSite = await puter.hosting.create(siteName, siteFolderPath);
+                    deployActionMessage = `Website created at https://${finalSite.subdomain}.puter.site`;
+                }
+
+                // Hide loading before showing alert
+                hideLoading();
+
+                addMessageToChatUI('system', deployActionMessage);
+                chatMessagesForAI.push({ role: 'system', content: deployActionMessage });
+
+                await puter.ui.alert(`Website deployed!\nVisit: https://${finalSite.subdomain}.puter.site`, [{ label: 'OK', type: 'success' }]);
+                showToast('success', 'Deployed!', `Site live at https://${finalSite.subdomain}.puter.site`);
+            } catch (error) {
+                // Hide loading before showing alert
+                hideLoading();
+
+                console.error('Deploy Error:', error);
+                const errorMsg = error.message.toLowerCase().includes('subdomain already taken') ? `Subdomain "${siteName}" is already taken.` : error.message;
+                await puter.ui.alert(`Deployment Failed: ${errorMsg}`, [{ label: 'OK', type: 'danger' }]);
+                showToast('error', 'Deploy Failed', errorMsg);
+                addMessageToChatUI('system', `Deployment failed: ${errorMsg}`);
+                chatMessagesForAI.push({ role: 'system', content: `Deployment failed: ${errorMsg}` });
+            }
+        }
+
+        // --- Loading & Toasts ---
+        function showLoading(message = "Thinking...") {
+            loadingMessage.textContent = message;
+            loadingOverlay.style.display = 'flex';
+        }
+
+        function hideLoading() {
+            loadingOverlay.style.display = 'none';
+        }
+
+        function showToast(type, title, message) {
+            const toastContainer = document.getElementById('toastContainer');
+            if (!toastContainer) { console.warn("Toast container not found"); return; }
+            const toast = document.createElement('div');
+            toast.className = `toast ${type}`;
+            const safeMessage = DOMPurify.sanitize(String(message)); // Ensure message is string
+            toast.innerHTML = `<div class="toast-icon"><i class="fas ${type === 'success' ? 'fa-check-circle' : 'fa-exclamation-triangle'}"></i></div><div class="toast-content"><div class="toast-title">${DOMPurify.sanitize(String(title))}</div><div class="toast-message">${safeMessage}</div></div><button class="toast-close" title="Close">×</button>`;
+            toastContainer.appendChild(toast);
+            toast.querySelector('.toast-close').addEventListener('click', () => { toast.style.animation = 'slideOut 0.3s forwards'; setTimeout(() => toast.remove(), 300); });
+            setTimeout(() => { if (toast.parentNode) { toast.style.animation = 'slideOut 0.3s forwards'; setTimeout(() => { if (toast.parentNode) toast.remove(); }, 300); } }, 5000);
+        }
+
+        // --- Run ---
+        document.addEventListener('DOMContentLoaded', initializeApp);
+    </script>
+</body>
+
+</html>
